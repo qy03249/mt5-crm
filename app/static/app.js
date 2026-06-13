@@ -12,6 +12,10 @@ const state = {
   operationLogs: [],
   crmUsers: [],
   crmEditingUser: null,
+  crmFilters: {
+    keyword: "",
+    mt5_login: "",
+  },
 };
 
 const topMenus = [
@@ -535,11 +539,11 @@ function renderCrmUserPage() {
   return `
     <section class="page-title">CRM用户</section>
     <section class="toolbar">
-      <input class="search-input" placeholder="姓名/手机/邮箱" />
-      <input class="search-input compact-input" placeholder="交易账号" />
-      <button class="ghost-button" type="button">查询</button>
-      <button class="ghost-button" type="button">重置</button>
-      <button class="ghost-button" type="button">导出</button>
+      <input class="search-input" id="crmKeywordInput" placeholder="姓名/手机/邮箱" value="${escapeHtml(state.crmFilters.keyword)}" />
+      <input class="search-input compact-input" id="crmMt5LoginInput" placeholder="交易账号" value="${escapeHtml(state.crmFilters.mt5_login)}" />
+      <button class="ghost-button" type="button" id="crmSearchButton">查询</button>
+      <button class="ghost-button" type="button" id="crmResetButton">重置</button>
+      <button class="ghost-button" type="button" id="crmExportButton">导出</button>
       <button class="primary-button" type="button" id="openCrmCreateButton">+ 新增用户</button>
     </section>
     <section class="panel table-panel">
@@ -624,6 +628,14 @@ function renderCrmUserModal() {
             <input name="email" value="${escapeHtml(user.email || "")}" />
           </div>
           <div class="field">
+            <label>MT5账号</label>
+            <input name="mt5_login" value="${escapeHtml(user.mt5_login || "")}" />
+          </div>
+          <div class="field">
+            <label>上级MT5账号</label>
+            <input name="parent_mt5_login" value="${escapeHtml(user.parent_mt5_login || "")}" />
+          </div>
+          <div class="field">
             <label>上级用户</label>
             <select name="parent_id">
               <option value="">无</option>
@@ -695,6 +707,8 @@ function bindCrmUserActions() {
       nickname: "",
       phone: "",
       email: "",
+      mt5_login: "",
+      parent_mt5_login: "",
       parent_id: null,
       parent_code: "",
       role_type: "customer",
@@ -726,6 +740,9 @@ function bindCrmUserActions() {
   document.querySelector("#closeCrmModalButton")?.addEventListener("click", closeCrmModal);
   document.querySelector("#cancelCrmModalButton")?.addEventListener("click", closeCrmModal);
   document.querySelector("#crmUserForm")?.addEventListener("submit", submitCrmUserForm);
+  document.querySelector("#crmSearchButton")?.addEventListener("click", searchCrmUsers);
+  document.querySelector("#crmResetButton")?.addEventListener("click", resetCrmFilters);
+  document.querySelector("#crmExportButton")?.addEventListener("click", exportCrmUsers);
 }
 
 function closeCrmModal() {
@@ -743,6 +760,8 @@ async function submitCrmUserForm(event) {
     nickname: emptyToNull(form.get("nickname")),
     phone: emptyToNull(form.get("phone")),
     email: emptyToNull(form.get("email")),
+    mt5_login: emptyToNull(form.get("mt5_login")),
+    parent_mt5_login: emptyToNull(form.get("parent_mt5_login")),
     parent_id: form.get("parent_id") ? Number(form.get("parent_id")) : null,
     parent_code: emptyToNull(form.get("parent_code")),
     role_type: form.get("role_type"),
@@ -759,8 +778,66 @@ async function submitCrmUserForm(event) {
 }
 
 async function refreshCrmUsers() {
-  state.crmUsers = await request("/crm/users");
+  const params = new URLSearchParams();
+  if (state.crmFilters.keyword) params.set("keyword", state.crmFilters.keyword);
+  if (state.crmFilters.mt5_login) params.set("mt5_login", state.crmFilters.mt5_login);
+  const query = params.toString();
+  state.crmUsers = await request(`/crm/users${query ? `?${query}` : ""}`);
   renderApp();
+}
+
+async function searchCrmUsers() {
+  state.crmFilters.keyword = document.querySelector("#crmKeywordInput")?.value.trim() || "";
+  state.crmFilters.mt5_login = document.querySelector("#crmMt5LoginInput")?.value.trim() || "";
+  await refreshCrmUsers();
+}
+
+async function resetCrmFilters() {
+  state.crmFilters = { keyword: "", mt5_login: "" };
+  await refreshCrmUsers();
+}
+
+function exportCrmUsers() {
+  const headers = [
+    "编号",
+    "备注",
+    "MT5账号",
+    "创建时间",
+    "姓名",
+    "上级",
+    "上级MT5账号",
+    "手机",
+    "邮箱",
+    "状态",
+  ];
+  const rows = state.crmUsers.map((user) => [
+    user.id,
+    user.remark || "",
+    user.mt5_login || "",
+    formatDateTime(user.created_at),
+    user.name || user.nickname || "",
+    user.parent_name || "",
+    user.parent_mt5_login || "",
+    user.phone || "",
+    user.email || "",
+    enumLabel("userStatus", user.status),
+  ]);
+  downloadCsv("crm-users.csv", [headers, ...rows]);
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows
+    .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function emptyToNull(value) {

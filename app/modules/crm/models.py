@@ -16,6 +16,8 @@ class CrmUser(Base):
     nickname: Mapped[str | None] = mapped_column(String(128), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mt5_login: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    parent_mt5_login: Mapped[str | None] = mapped_column(String(64), nullable=True)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("crm_users.id"), nullable=True)
     parent_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     role_type: Mapped[str] = mapped_column(String(32), default="customer")

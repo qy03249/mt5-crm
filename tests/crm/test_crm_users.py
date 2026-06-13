@@ -78,6 +78,8 @@ def test_admin_can_list_crm_users(client: TestClient, db_session: Session):
         nickname="客户一号",
         email="client@example.test",
         phone="13900000000",
+        mt5_login="900001",
+        parent_mt5_login="800001",
         parent=parent,
         parent_code="AG001",
         role_type="customer",
@@ -95,6 +97,50 @@ def test_admin_can_list_crm_users(client: TestClient, db_session: Session):
     assert response.json()[0]["name"] == "张三"
     assert response.json()[0]["parent_name"] == "上级代理"
     assert response.json()[0]["remark"] == "首个CRM客户"
+    assert response.json()[0]["mt5_login"] == "900001"
+
+
+def test_admin_can_filter_crm_users(client: TestClient, db_session: Session):
+    admin = seed_admin(db_session)
+    db_session.add_all(
+        [
+            CrmUser(
+                username="client001",
+                name="张三",
+                phone="13900000000",
+                email="client@example.test",
+                mt5_login="900001",
+                role_type="customer",
+                certification_status="pending",
+                status="active",
+            ),
+            CrmUser(
+                username="client002",
+                name="李四",
+                phone="13700000000",
+                email="other@example.test",
+                mt5_login="900002",
+                role_type="customer",
+                certification_status="approved",
+                status="active",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    keyword_response = client.get(
+        "/api/v1/crm/users?keyword=张三",
+        headers=auth_headers(admin),
+    )
+    mt5_response = client.get(
+        "/api/v1/crm/users?mt5_login=900002",
+        headers=auth_headers(admin),
+    )
+
+    assert keyword_response.status_code == 200
+    assert [item["name"] for item in keyword_response.json()] == ["张三"]
+    assert mt5_response.status_code == 200
+    assert [item["name"] for item in mt5_response.json()] == ["李四"]
 
 
 def test_admin_can_create_crm_user(client: TestClient, db_session: Session):
@@ -120,6 +166,8 @@ def test_admin_can_create_crm_user(client: TestClient, db_session: Session):
             "nickname": "客户二号",
             "phone": "13700000000",
             "email": "client2@example.test",
+            "mt5_login": "900003",
+            "parent_mt5_login": "800003",
             "parent_id": parent.id,
             "parent_code": "AG001",
             "role_type": "customer",
@@ -133,6 +181,7 @@ def test_admin_can_create_crm_user(client: TestClient, db_session: Session):
     assert response.json()["name"] == "李四"
     assert response.json()["parent_name"] == "上级代理"
     assert response.json()["status"] == "active"
+    assert response.json()["mt5_login"] == "900003"
 
 
 def test_admin_can_read_update_and_change_crm_user_status(
@@ -145,6 +194,7 @@ def test_admin_can_read_update_and_change_crm_user_status(
         name="王五",
         phone="13600000000",
         email="client3@example.test",
+        mt5_login="900004",
         role_type="customer",
         certification_status="pending",
         status="active",
@@ -165,6 +215,8 @@ def test_admin_can_read_update_and_change_crm_user_status(
             "nickname": "编辑昵称",
             "phone": "13611111111",
             "email": "client3-edit@example.test",
+            "mt5_login": "900005",
+            "parent_mt5_login": "800005",
             "parent_id": None,
             "parent_code": None,
             "role_type": "ib",
@@ -184,5 +236,6 @@ def test_admin_can_read_update_and_change_crm_user_status(
     assert update.status_code == 200
     assert update.json()["name"] == "王五编辑"
     assert update.json()["role_type"] == "ib"
+    assert update.json()["mt5_login"] == "900005"
     assert status_response.status_code == 200
     assert status_response.json()["status"] == "disabled"

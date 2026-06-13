@@ -9,6 +9,8 @@ class CrmUserCreate(BaseModel):
     nickname: str | None = Field(default=None, max_length=128)
     phone: str | None = Field(default=None, max_length=64)
     email: str | None = Field(default=None, max_length=255)
+    mt5_login: str | None = Field(default=None, max_length=64)
+    parent_mt5_login: str | None = Field(default=None, max_length=64)
     parent_id: int | None = None
     parent_code: str | None = Field(default=None, max_length=64)
     role_type: str = Field(default="customer", max_length=32)

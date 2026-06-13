@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
@@ -24,6 +24,8 @@ def crm_user_to_read(user: CrmUser) -> CrmUserRead:
         nickname=user.nickname,
         phone=user.phone,
         email=user.email,
+        mt5_login=user.mt5_login,
+        parent_mt5_login=user.parent_mt5_login,
         parent_id=user.parent_id,
         parent_name=user.parent.name if user.parent else None,
         parent_code=user.parent_code,
@@ -31,8 +33,6 @@ def crm_user_to_read(user: CrmUser) -> CrmUserRead:
         certification_status=user.certification_status,
         status=user.status,
         remark=user.remark,
-        mt5_login=None,
-        parent_mt5_login=None,
         created_at=user.created_at,
     )
 
@@ -64,9 +64,27 @@ def resolve_parent(
 
 
 @router.get("/users", response_model=list[CrmUserRead])
-def list_crm_users(db: Annotated[Session, Depends(get_db)]) -> list[CrmUserRead]:
+def list_crm_users(
+    db: Annotated[Session, Depends(get_db)],
+    keyword: str | None = None,
+    mt5_login: str | None = None,
+) -> list[CrmUserRead]:
+    query = select(CrmUser).options(selectinload(CrmUser.parent)).order_by(desc(CrmUser.id))
+    if keyword:
+        keyword_like = f"%{keyword}%"
+        query = query.where(
+            or_(
+                CrmUser.name.like(keyword_like),
+                CrmUser.nickname.like(keyword_like),
+                CrmUser.phone.like(keyword_like),
+                CrmUser.email.like(keyword_like),
+            )
+        )
+    if mt5_login:
+        query = query.where(CrmUser.mt5_login == mt5_login)
+
     users = db.scalars(
-        select(CrmUser).options(selectinload(CrmUser.parent)).order_by(desc(CrmUser.id))
+        query
     ).all()
     return [crm_user_to_read(user) for user in users]
 
@@ -83,6 +101,8 @@ def create_crm_user(
         nickname=payload.nickname,
         phone=payload.phone,
         email=payload.email,
+        mt5_login=payload.mt5_login,
+        parent_mt5_login=payload.parent_mt5_login,
         parent=parent,
         parent_code=payload.parent_code,
         role_type=payload.role_type,
@@ -113,6 +133,8 @@ def update_crm_user(
     user.nickname = payload.nickname
     user.phone = payload.phone
     user.email = payload.email
+    user.mt5_login = payload.mt5_login
+    user.parent_mt5_login = payload.parent_mt5_login
     user.parent = resolve_parent(db, payload.parent_id, user_id)
     user.parent_code = payload.parent_code
     user.role_type = payload.role_type

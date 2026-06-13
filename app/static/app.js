@@ -23,6 +23,24 @@ const topMenus = [
   { key: "setting", label: "设置" },
 ];
 
+const enumLabels = {
+  roleType: {
+    customer: "普通客户",
+    agent: "代理",
+    ib: "IB",
+  },
+  certificationStatus: {
+    pending: "待认证",
+    approved: "认证通过",
+    rejected: "认证拒绝",
+  },
+  userStatus: {
+    active: "启用",
+    disabled: "禁用",
+    blacklisted: "黑名单",
+  },
+};
+
 const navigation = {
   home: [
     {
@@ -223,6 +241,10 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function enumLabel(group, value) {
+  return enumLabels[group]?.[value] || value || "-";
 }
 
 function render() {
@@ -551,7 +573,7 @@ function renderCrmUserPage() {
                   <td>${escapeHtml(user.parent_mt5_login || "-")}</td>
                   <td>${escapeHtml(user.phone || "-")}</td>
                   <td>${escapeHtml(user.email || "-")}</td>
-                  <td><span class="tag success">${escapeHtml(user.status)}</span></td>
+                  <td><span class="tag success">${escapeHtml(enumLabel("userStatus", user.status))}</span></td>
                   <td>
                     <button class="table-action" type="button" data-crm-edit="${user.id}">编辑</button>
                     <button class="table-action" type="button" data-crm-status="${user.id}" data-next-status="${user.status === "active" ? "disabled" : "active"}">
@@ -624,9 +646,9 @@ function renderCrmUserModal() {
           <div class="field">
             <label>角色</label>
             <select name="role_type">
-              ${["customer", "agent", "ib"]
+              ${Object.entries(enumLabels.roleType)
                 .map(
-                  (role) => `<option value="${role}" ${user.role_type === role ? "selected" : ""}>${role}</option>`,
+                  ([value, label]) => `<option value="${value}" ${user.role_type === value ? "selected" : ""}>${label}</option>`,
                 )
                 .join("")}
             </select>
@@ -634,9 +656,9 @@ function renderCrmUserModal() {
           <div class="field">
             <label>认证状态</label>
             <select name="certification_status">
-              ${["pending", "approved", "rejected"]
+              ${Object.entries(enumLabels.certificationStatus)
                 .map(
-                  (status) => `<option value="${status}" ${user.certification_status === status ? "selected" : ""}>${status}</option>`,
+                  ([value, label]) => `<option value="${value}" ${user.certification_status === value ? "selected" : ""}>${label}</option>`,
                 )
                 .join("")}
             </select>
@@ -644,9 +666,9 @@ function renderCrmUserModal() {
           <div class="field">
             <label>状态</label>
             <select name="status">
-              ${["active", "disabled", "blacklisted"]
+              ${Object.entries(enumLabels.userStatus)
                 .map(
-                  (status) => `<option value="${status}" ${user.status === status ? "selected" : ""}>${status}</option>`,
+                  ([value, label]) => `<option value="${value}" ${user.status === value ? "selected" : ""}>${label}</option>`,
                 )
                 .join("")}
             </select>

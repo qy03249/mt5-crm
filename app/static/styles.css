@@ -302,6 +302,10 @@ button {
   padding: 0 12px;
 }
 
+.compact-input {
+  width: 180px;
+}
+
 .filter-select {
   min-width: 132px;
   height: 36px;

@@ -10,6 +10,7 @@ const state = {
   roles: [],
   permissionTree: [],
   operationLogs: [],
+  crmUsers: [],
 };
 
 const topMenus = [
@@ -198,18 +199,20 @@ async function login(username, password) {
 }
 
 async function loadAppData() {
-  const [user, accounts, roles, permissionTree, operationLogs] = await Promise.all([
+  const [user, accounts, roles, permissionTree, operationLogs, crmUsers] = await Promise.all([
     request("/auth/me"),
     request("/admin/accounts"),
     request("/admin/roles"),
     request("/admin/permissions/tree"),
     request("/admin/operation-logs"),
+    request("/crm/users"),
   ]);
   state.user = user;
   state.accounts = accounts;
   state.roles = roles;
   state.permissionTree = permissionTree;
   state.operationLogs = operationLogs;
+  state.crmUsers = crmUsers;
   render();
 }
 
@@ -355,6 +358,9 @@ function renderMain() {
   if (state.sidePage === "record.operationLog") {
     return renderOperationLogPage();
   }
+  if (state.sidePage === "client.crmUser") {
+    return renderCrmUserPage();
+  }
   return renderPlaceholderPage();
 }
 
@@ -491,6 +497,58 @@ function renderOperationLogPage() {
                   <td>${escapeHtml(log.ip_address)}</td>
                   <td><span class="tag ${log.result === "success" ? "success" : "danger"}">${escapeHtml(log.result)}</span></td>
                   <td>${formatDateTime(log.operated_at)}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </section>
+  `;
+}
+
+function renderCrmUserPage() {
+  return `
+    <section class="page-title">CRM用户</section>
+    <section class="toolbar">
+      <input class="search-input" placeholder="姓名/手机/邮箱" />
+      <input class="search-input compact-input" placeholder="交易账号" />
+      <button class="ghost-button" type="button">查询</button>
+      <button class="ghost-button" type="button">重置</button>
+      <button class="ghost-button" type="button">导出</button>
+      <button class="primary-button" type="button">+ 新增用户</button>
+    </section>
+    <section class="panel table-panel">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>编号</th>
+            <th>备注</th>
+            <th>MT5账号</th>
+            <th>创建时间</th>
+            <th>姓名</th>
+            <th>上级</th>
+            <th>上级MT5账号</th>
+            <th>手机</th>
+            <th>邮箱</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.crmUsers
+            .map(
+              (user) => `
+                <tr>
+                  <td>${user.id}</td>
+                  <td>${escapeHtml(user.remark || "-")}</td>
+                  <td>${escapeHtml(user.mt5_login || "-")}</td>
+                  <td>${formatDateTime(user.created_at)}</td>
+                  <td>${escapeHtml(user.name || user.nickname || "-")}</td>
+                  <td>${escapeHtml(user.parent_name || "-")}</td>
+                  <td>${escapeHtml(user.parent_mt5_login || "-")}</td>
+                  <td>${escapeHtml(user.phone || "-")}</td>
+                  <td>${escapeHtml(user.email || "-")}</td>
+                  <td><span class="tag success">${escapeHtml(user.status)}</span></td>
                 </tr>
               `,
             )

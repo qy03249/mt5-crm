@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
+from app.modules.crm.router import router as crm_router
 
 app = FastAPI(title="MT5 CRM API")
 
@@ -18,6 +19,7 @@ register_exception_handlers(app)
 app.middleware("http")(audit_operation_middleware)
 app.include_router(auth_router, prefix=settings.api_v1_prefix)
 app.include_router(admin_router, prefix=settings.api_v1_prefix)
+app.include_router(crm_router, prefix=settings.api_v1_prefix)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

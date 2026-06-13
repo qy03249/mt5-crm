@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, String, Table
+from sqlalchemy import Column, DateTime, ForeignKey, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -94,3 +94,18 @@ class Permission(Base):
         secondary=role_permissions,
         back_populates="permissions",
     )
+
+
+class OperationLog(Base):
+    __tablename__ = "operation_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    operator_id: Mapped[int | None] = mapped_column(nullable=True)
+    operator_name: Mapped[str] = mapped_column(String(64))
+    path: Mapped[str] = mapped_column(String(255))
+    method: Mapped[str] = mapped_column(String(16))
+    ip_address: Mapped[str] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    params_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result: Mapped[str] = mapped_column(String(32))
+    operated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)

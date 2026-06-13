@@ -6,7 +6,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
-from app.modules.admin.models import AdminUser, Permission, Role
+from app.modules.admin.models import AdminUser, OperationLog, Permission, Role
 from app.modules.auth.security import hash_password
 
 
@@ -30,10 +30,12 @@ def client(db_session: Session):
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.state.audit_session_factory = lambda: db_session
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+        del app.state.audit_session_factory
 
 
 def seed_admin_with_menu_permission(db: Session) -> AdminUser:
@@ -153,6 +155,23 @@ def test_validation_error_uses_unified_response(client: TestClient):
     assert response.json()["code"] == "validation_error"
     assert response.json()["message"] == "请求参数校验失败"
     assert response.json()["data"][0]["loc"] == ["body", "password"]
+
+
+def test_write_api_creates_operation_log(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "Admin@123456"},
+    )
+
+    assert response.status_code == 200
+    log = db_session.query(OperationLog).one()
+    assert log.operator_name == "anonymous"
+    assert log.path == "/api/v1/auth/login"
+    assert log.method == "POST"
+    assert log.result == "success"
+    assert '"password": "***"' in log.params_json
 
 
 def test_current_user_can_read_menu_permissions(client: TestClient, db_session: Session):

@@ -10,3 +10,12 @@ def test_health_endpoint_returns_service_status():
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "mt5-crm-api"}
+
+
+def test_root_serves_frontend_app():
+    client = TestClient(app)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "MT5 CRM" in response.text

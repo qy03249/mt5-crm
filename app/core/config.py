@@ -20,6 +20,14 @@ class Settings(BaseSettings):
     mysql_password: str = Field(default="root", repr=False)
     mysql_database: str = "mt5_crm"
 
+    jwt_secret_key: str = Field(default="change-me-in-production", repr=False)
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 8
+
+    initial_admin_username: str = "admin"
+    initial_admin_password: str = Field(default="Admin@123456", repr=False)
+    initial_admin_email: str = "admin@example.com"
+
     @cached_property
     def database_url(self) -> str:
         return (

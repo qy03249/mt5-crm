@@ -1,0 +1,193 @@
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.core.database import Base, get_db
+from app.main import app
+from app.modules.admin.models import AdminUser, Permission, Role
+from app.modules.auth.security import hash_password
+
+
+@pytest.fixture()
+def db_session():
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    Base.metadata.create_all(bind=engine)
+
+    with TestingSessionLocal() as session:
+        yield session
+
+
+@pytest.fixture()
+def client(db_session: Session):
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def seed_admin_with_menu_permission(db: Session) -> AdminUser:
+    role = Role(code="admin", name="管理员")
+    permission = Permission(
+        code="dashboard.view",
+        name="首页",
+        type="menu",
+        path="/home",
+    )
+    button_permission = Permission(
+        code="admin.account.manage",
+        name="后台账户管理",
+        type="button",
+        path="/setting/permissions/account",
+    )
+    admin = AdminUser(
+        username="admin",
+        password_hash=hash_password("Admin@123456"),
+        display_name="系统管理员",
+        email="admin@example.test",
+        status="active",
+    )
+    role.permissions.extend([permission, button_permission])
+    admin.roles.append(role)
+    db.add(admin)
+    db.commit()
+    db.refresh(admin)
+    return admin
+
+
+def login(client: TestClient, username: str = "admin", password: str = "Admin@123456") -> str:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+def test_admin_can_login_and_read_current_user(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+
+    token = login(client)
+    me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert me.status_code == 200
+    assert me.json() == {
+        "id": 1,
+        "username": "admin",
+        "display_name": "系统管理员",
+        "email": "admin@example.test",
+        "roles": [{"id": 1, "code": "admin", "name": "管理员"}],
+    }
+
+
+def test_login_rejects_wrong_password(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": "admin", "password": "wrong-password"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid username or password"
+
+
+def test_current_user_can_read_menu_permissions(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+
+    token = login(client)
+    response = client.get(
+        "/api/v1/admin/permissions/menus",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": 1,
+            "code": "dashboard.view",
+            "name": "首页",
+            "type": "menu",
+            "path": "/home",
+            "parent_id": None,
+        }
+    ]
+
+
+def test_current_user_can_read_button_permissions(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+
+    token = login(client)
+    response = client.get(
+        "/api/v1/admin/permissions/buttons",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": 2,
+            "code": "admin.account.manage",
+            "name": "后台账户管理",
+            "type": "button",
+            "path": "/setting/permissions/account",
+            "parent_id": None,
+        }
+    ]
+
+
+def test_admin_can_create_role_permission_account_and_assign_permission(
+    client: TestClient, db_session: Session
+):
+    seed_admin_with_menu_permission(db_session)
+    token = login(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    role = client.post(
+        "/api/v1/admin/roles",
+        json={"code": "finance", "name": "财务"},
+        headers=headers,
+    )
+    permission = client.post(
+        "/api/v1/admin/permissions",
+        json={
+            "code": "finance.deposit.review",
+            "name": "入金审核",
+            "type": "button",
+            "path": "/task/deposit",
+        },
+        headers=headers,
+    )
+    assign = client.put(
+        f"/api/v1/admin/roles/{role.json()['id']}/permissions",
+        json={"permission_ids": [permission.json()["id"]]},
+        headers=headers,
+    )
+    account = client.post(
+        "/api/v1/admin/accounts",
+        json={
+            "username": "finance01",
+            "password": "Finance@123456",
+            "display_name": "财务一号",
+            "email": "finance01@example.test",
+            "role_ids": [role.json()["id"]],
+        },
+        headers=headers,
+    )
+
+    assert role.status_code == 201
+    assert permission.status_code == 201
+    assert assign.status_code == 200
+    assert assign.json()["permission_count"] == 1
+    assert account.status_code == 201
+    assert account.json()["username"] == "finance01"

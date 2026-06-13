@@ -128,7 +128,31 @@ def test_login_rejects_wrong_password(client: TestClient, db_session: Session):
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid username or password"
+    assert response.json() == {
+        "code": "http_error",
+        "message": "Invalid username or password",
+        "data": None,
+    }
+
+
+def test_protected_api_requires_unified_auth_error(client: TestClient):
+    response = client.get("/api/v1/admin/accounts")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "code": "http_error",
+        "message": "Not authenticated",
+        "data": None,
+    }
+
+
+def test_validation_error_uses_unified_response(client: TestClient):
+    response = client.post("/api/v1/auth/login", json={"username": "admin"})
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    assert response.json()["message"] == "请求参数校验失败"
+    assert response.json()["data"][0]["loc"] == ["body", "password"]
 
 
 def test_current_user_can_read_menu_permissions(client: TestClient, db_session: Session):

@@ -170,7 +170,7 @@ async function request(path, options = {}) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) {
-    throw new Error(data?.detail || "请求失败");
+    throw new Error(data?.message || data?.detail || "请求失败");
   }
   return data;
 }

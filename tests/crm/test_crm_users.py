@@ -95,3 +95,94 @@ def test_admin_can_list_crm_users(client: TestClient, db_session: Session):
     assert response.json()[0]["name"] == "张三"
     assert response.json()[0]["parent_name"] == "上级代理"
     assert response.json()[0]["remark"] == "首个CRM客户"
+
+
+def test_admin_can_create_crm_user(client: TestClient, db_session: Session):
+    admin = seed_admin(db_session)
+    parent = CrmUser(
+        username="agent001",
+        name="上级代理",
+        email="agent@example.test",
+        parent_code="AG001",
+        role_type="agent",
+        certification_status="approved",
+        status="active",
+    )
+    db_session.add(parent)
+    db_session.commit()
+
+    response = client.post(
+        "/api/v1/crm/users",
+        headers=auth_headers(admin),
+        json={
+            "username": "client002",
+            "name": "李四",
+            "nickname": "客户二号",
+            "phone": "13700000000",
+            "email": "client2@example.test",
+            "parent_id": parent.id,
+            "parent_code": "AG001",
+            "role_type": "customer",
+            "certification_status": "pending",
+            "remark": "页面新增客户",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["username"] == "client002"
+    assert response.json()["name"] == "李四"
+    assert response.json()["parent_name"] == "上级代理"
+    assert response.json()["status"] == "active"
+
+
+def test_admin_can_read_update_and_change_crm_user_status(
+    client: TestClient,
+    db_session: Session,
+):
+    admin = seed_admin(db_session)
+    user = CrmUser(
+        username="client003",
+        name="王五",
+        phone="13600000000",
+        email="client3@example.test",
+        role_type="customer",
+        certification_status="pending",
+        status="active",
+        remark="待编辑客户",
+    )
+    db_session.add(user)
+    db_session.commit()
+    user_id = user.id
+    headers = auth_headers(admin)
+
+    detail = client.get(f"/api/v1/crm/users/{user_id}", headers=headers)
+    update = client.put(
+        f"/api/v1/crm/users/{user_id}",
+        headers=headers,
+        json={
+            "username": "client003",
+            "name": "王五编辑",
+            "nickname": "编辑昵称",
+            "phone": "13611111111",
+            "email": "client3-edit@example.test",
+            "parent_id": None,
+            "parent_code": None,
+            "role_type": "ib",
+            "certification_status": "approved",
+            "status": "active",
+            "remark": "已编辑客户",
+        },
+    )
+    status_response = client.patch(
+        f"/api/v1/crm/users/{user_id}/status",
+        headers=headers,
+        json={"status": "disabled"},
+    )
+
+    assert detail.status_code == 200
+    assert detail.json()["name"] == "王五"
+    assert update.status_code == 200
+    assert update.json()["name"] == "王五编辑"
+    assert update.json()["role_type"] == "ib"
+    assert status_response.status_code == 200
+    assert status_response.json()["status"] == "disabled"

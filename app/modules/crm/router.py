@@ -1,13 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.modules.auth.dependencies import get_current_admin_user
 from app.modules.crm.models import CrmUser
-from app.modules.crm.schemas import CrmUserRead
+from app.modules.crm.schemas import CrmUserCreate, CrmUserRead, CrmUserStatusUpdate, CrmUserUpdate
 
 router = APIRouter(
     prefix="/crm",
@@ -37,9 +37,101 @@ def crm_user_to_read(user: CrmUser) -> CrmUserRead:
     )
 
 
+def get_crm_user_or_404(db: Session, user_id: int) -> CrmUser:
+    user = db.scalar(
+        select(CrmUser)
+        .where(CrmUser.id == user_id)
+        .options(selectinload(CrmUser.parent))
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="CRM user not found")
+    return user
+
+
+def resolve_parent(
+    db: Session,
+    parent_id: int | None,
+    user_id: int | None = None,
+) -> CrmUser | None:
+    if parent_id is None:
+        return None
+    if user_id is not None and parent_id == user_id:
+        raise HTTPException(status_code=400, detail="Parent CRM user cannot be self")
+    parent = db.get(CrmUser, parent_id)
+    if parent is None:
+        raise HTTPException(status_code=400, detail="Parent CRM user does not exist")
+    return parent
+
+
 @router.get("/users", response_model=list[CrmUserRead])
 def list_crm_users(db: Annotated[Session, Depends(get_db)]) -> list[CrmUserRead]:
     users = db.scalars(
         select(CrmUser).options(selectinload(CrmUser.parent)).order_by(desc(CrmUser.id))
     ).all()
     return [crm_user_to_read(user) for user in users]
+
+
+@router.post("/users", response_model=CrmUserRead, status_code=status.HTTP_201_CREATED)
+def create_crm_user(
+    payload: CrmUserCreate,
+    db: Annotated[Session, Depends(get_db)],
+) -> CrmUserRead:
+    parent = resolve_parent(db, payload.parent_id)
+    user = CrmUser(
+        username=payload.username,
+        name=payload.name,
+        nickname=payload.nickname,
+        phone=payload.phone,
+        email=payload.email,
+        parent=parent,
+        parent_code=payload.parent_code,
+        role_type=payload.role_type,
+        certification_status=payload.certification_status,
+        status=payload.status,
+        remark=payload.remark,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return crm_user_to_read(user)
+
+
+@router.get("/users/{user_id}", response_model=CrmUserRead)
+def read_crm_user(user_id: int, db: Annotated[Session, Depends(get_db)]) -> CrmUserRead:
+    return crm_user_to_read(get_crm_user_or_404(db, user_id))
+
+
+@router.put("/users/{user_id}", response_model=CrmUserRead)
+def update_crm_user(
+    user_id: int,
+    payload: CrmUserUpdate,
+    db: Annotated[Session, Depends(get_db)],
+) -> CrmUserRead:
+    user = get_crm_user_or_404(db, user_id)
+    user.username = payload.username
+    user.name = payload.name
+    user.nickname = payload.nickname
+    user.phone = payload.phone
+    user.email = payload.email
+    user.parent = resolve_parent(db, payload.parent_id, user_id)
+    user.parent_code = payload.parent_code
+    user.role_type = payload.role_type
+    user.certification_status = payload.certification_status
+    user.status = payload.status
+    user.remark = payload.remark
+    db.commit()
+    db.refresh(user)
+    return crm_user_to_read(user)
+
+
+@router.patch("/users/{user_id}/status", response_model=CrmUserRead)
+def update_crm_user_status(
+    user_id: int,
+    payload: CrmUserStatusUpdate,
+    db: Annotated[Session, Depends(get_db)],
+) -> CrmUserRead:
+    user = get_crm_user_or_404(db, user_id)
+    user.status = payload.status
+    db.commit()
+    db.refresh(user)
+    return crm_user_to_read(user)

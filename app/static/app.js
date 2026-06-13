@@ -11,6 +11,7 @@ const state = {
   permissionTree: [],
   operationLogs: [],
   crmUsers: [],
+  crmEditingUser: null,
 };
 
 const topMenus = [
@@ -318,6 +319,7 @@ function renderApp() {
   });
 
   document.querySelector("#logoutButton")?.addEventListener("click", () => logout());
+  bindCrmUserActions();
 }
 
 function renderSidebar() {
@@ -516,7 +518,7 @@ function renderCrmUserPage() {
       <button class="ghost-button" type="button">查询</button>
       <button class="ghost-button" type="button">重置</button>
       <button class="ghost-button" type="button">导出</button>
-      <button class="primary-button" type="button">+ 新增用户</button>
+      <button class="primary-button" type="button" id="openCrmCreateButton">+ 新增用户</button>
     </section>
     <section class="panel table-panel">
       <table class="table">
@@ -532,6 +534,7 @@ function renderCrmUserPage() {
             <th>手机</th>
             <th>邮箱</th>
             <th>状态</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -549,6 +552,12 @@ function renderCrmUserPage() {
                   <td>${escapeHtml(user.phone || "-")}</td>
                   <td>${escapeHtml(user.email || "-")}</td>
                   <td><span class="tag success">${escapeHtml(user.status)}</span></td>
+                  <td>
+                    <button class="table-action" type="button" data-crm-edit="${user.id}">编辑</button>
+                    <button class="table-action" type="button" data-crm-status="${user.id}" data-next-status="${user.status === "active" ? "disabled" : "active"}">
+                      ${user.status === "active" ? "禁用" : "启用"}
+                    </button>
+                  </td>
                 </tr>
               `,
             )
@@ -556,7 +565,185 @@ function renderCrmUserPage() {
         </tbody>
       </table>
     </section>
+    ${state.crmEditingUser ? renderCrmUserModal() : ""}
   `;
+}
+
+function renderCrmUserModal() {
+  const user = state.crmEditingUser;
+  const isCreate = !user.id;
+  return `
+    <div class="modal-backdrop">
+      <section class="modal">
+        <div class="modal-header">
+          <h2>${isCreate ? "新增用户" : "编辑用户"}</h2>
+          <button class="icon-button" type="button" id="closeCrmModalButton">×</button>
+        </div>
+        <form id="crmUserForm" class="form-grid">
+          <input type="hidden" name="id" value="${escapeHtml(user.id || "")}" />
+          <div class="field">
+            <label>用户名</label>
+            <input name="username" value="${escapeHtml(user.username || "")}" />
+          </div>
+          <div class="field">
+            <label>姓名</label>
+            <input name="name" value="${escapeHtml(user.name || "")}" />
+          </div>
+          <div class="field">
+            <label>昵称</label>
+            <input name="nickname" value="${escapeHtml(user.nickname || "")}" />
+          </div>
+          <div class="field">
+            <label>手机</label>
+            <input name="phone" value="${escapeHtml(user.phone || "")}" />
+          </div>
+          <div class="field">
+            <label>邮箱</label>
+            <input name="email" value="${escapeHtml(user.email || "")}" />
+          </div>
+          <div class="field">
+            <label>上级用户</label>
+            <select name="parent_id">
+              <option value="">无</option>
+              ${state.crmUsers
+                .filter((item) => item.id !== user.id)
+                .map(
+                  (item) => `
+                    <option value="${item.id}" ${user.parent_id === item.id ? "selected" : ""}>
+                      ${escapeHtml(item.name || item.username || item.email || item.id)}
+                    </option>
+                  `,
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label>上级代码</label>
+            <input name="parent_code" value="${escapeHtml(user.parent_code || "")}" />
+          </div>
+          <div class="field">
+            <label>角色</label>
+            <select name="role_type">
+              ${["customer", "agent", "ib"]
+                .map(
+                  (role) => `<option value="${role}" ${user.role_type === role ? "selected" : ""}>${role}</option>`,
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label>认证状态</label>
+            <select name="certification_status">
+              ${["pending", "approved", "rejected"]
+                .map(
+                  (status) => `<option value="${status}" ${user.certification_status === status ? "selected" : ""}>${status}</option>`,
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="field">
+            <label>状态</label>
+            <select name="status">
+              ${["active", "disabled", "blacklisted"]
+                .map(
+                  (status) => `<option value="${status}" ${user.status === status ? "selected" : ""}>${status}</option>`,
+                )
+                .join("")}
+            </select>
+          </div>
+          <div class="field form-full">
+            <label>备注</label>
+            <input name="remark" value="${escapeHtml(user.remark || "")}" />
+          </div>
+          <div class="modal-actions">
+            <button class="ghost-button" type="button" id="cancelCrmModalButton">取消</button>
+            <button class="primary-button" type="submit">保存</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function bindCrmUserActions() {
+  document.querySelector("#openCrmCreateButton")?.addEventListener("click", () => {
+    state.crmEditingUser = {
+      username: "",
+      name: "",
+      nickname: "",
+      phone: "",
+      email: "",
+      parent_id: null,
+      parent_code: "",
+      role_type: "customer",
+      certification_status: "pending",
+      status: "active",
+      remark: "",
+    };
+    renderApp();
+  });
+
+  document.querySelectorAll("[data-crm-edit]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const user = await request(`/crm/users/${button.dataset.crmEdit}`);
+      state.crmEditingUser = user;
+      renderApp();
+    });
+  });
+
+  document.querySelectorAll("[data-crm-status]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      await request(`/crm/users/${button.dataset.crmStatus}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: button.dataset.nextStatus }),
+      });
+      await refreshCrmUsers();
+    });
+  });
+
+  document.querySelector("#closeCrmModalButton")?.addEventListener("click", closeCrmModal);
+  document.querySelector("#cancelCrmModalButton")?.addEventListener("click", closeCrmModal);
+  document.querySelector("#crmUserForm")?.addEventListener("submit", submitCrmUserForm);
+}
+
+function closeCrmModal() {
+  state.crmEditingUser = null;
+  renderApp();
+}
+
+async function submitCrmUserForm(event) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const id = form.get("id");
+  const payload = {
+    username: emptyToNull(form.get("username")),
+    name: emptyToNull(form.get("name")),
+    nickname: emptyToNull(form.get("nickname")),
+    phone: emptyToNull(form.get("phone")),
+    email: emptyToNull(form.get("email")),
+    parent_id: form.get("parent_id") ? Number(form.get("parent_id")) : null,
+    parent_code: emptyToNull(form.get("parent_code")),
+    role_type: form.get("role_type"),
+    certification_status: form.get("certification_status"),
+    status: form.get("status"),
+    remark: emptyToNull(form.get("remark")),
+  };
+  await request(id ? `/crm/users/${id}` : "/crm/users", {
+    method: id ? "PUT" : "POST",
+    body: JSON.stringify(payload),
+  });
+  state.crmEditingUser = null;
+  await refreshCrmUsers();
+}
+
+async function refreshCrmUsers() {
+  state.crmUsers = await request("/crm/users");
+  renderApp();
+}
+
+function emptyToNull(value) {
+  const text = String(value || "").trim();
+  return text ? text : null;
 }
 
 function formatDateTime(value) {

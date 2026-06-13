@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -62,3 +65,16 @@ class AdminAccountRead(BaseModel):
     email: str | None = None
     status: str
     roles: list[RoleRead] = Field(default_factory=list)
+
+
+class OperationLogRead(BaseModel):
+    id: int
+    operator_id: int | None = None
+    operator_name: str
+    path: str
+    method: str
+    ip_address: str
+    user_agent: str | None = None
+    params_json: dict[str, Any] | None = None
+    result: str
+    operated_at: datetime

@@ -1,14 +1,16 @@
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
-from app.modules.admin.models import AdminUser, Permission, Role
+from app.modules.admin.models import AdminUser, OperationLog, Permission, Role
 from app.modules.admin.schemas import (
     AdminAccountCreate,
     AdminAccountRead,
+    OperationLogRead,
     PermissionCreate,
     PermissionRead,
     PermissionTreeRead,
@@ -87,6 +89,25 @@ def account_to_read(account: AdminUser) -> AdminAccountRead:
         email=account.email,
         status=account.status,
         roles=[role_to_read(role) for role in account.roles],
+    )
+
+
+def operation_log_to_read(log: OperationLog) -> OperationLogRead:
+    try:
+        params_json = json.loads(log.params_json) if log.params_json else None
+    except json.JSONDecodeError:
+        params_json = {"raw": log.params_json}
+    return OperationLogRead(
+        id=log.id,
+        operator_id=log.operator_id,
+        operator_name=log.operator_name,
+        path=log.path,
+        method=log.method,
+        ip_address=log.ip_address,
+        user_agent=log.user_agent,
+        params_json=params_json,
+        result=log.result,
+        operated_at=log.operated_at,
     )
 
 
@@ -230,3 +251,9 @@ def create_admin_account(
 def list_admin_accounts(db: Annotated[Session, Depends(get_db)]) -> list[AdminAccountRead]:
     accounts = db.scalars(select(AdminUser).options(selectinload(AdminUser.roles))).all()
     return [account_to_read(account) for account in accounts]
+
+
+@router.get("/operation-logs", response_model=list[OperationLogRead])
+def list_operation_logs(db: Annotated[Session, Depends(get_db)]) -> list[OperationLogRead]:
+    logs = db.scalars(select(OperationLog).order_by(desc(OperationLog.id)).limit(100)).all()
+    return [operation_log_to_read(log) for log in logs]

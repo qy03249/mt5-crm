@@ -302,6 +302,15 @@ button {
   padding: 0 12px;
 }
 
+.filter-select {
+  min-width: 132px;
+  height: 36px;
+  border: 1px solid #cfd8e3;
+  border-radius: 4px;
+  padding: 0 10px;
+  background: #fff;
+}
+
 .content-grid {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.2fr);
@@ -311,6 +320,10 @@ button {
 .panel {
   background: var(--surface);
   border: 1px solid var(--line);
+}
+
+.table-panel {
+  overflow-x: auto;
 }
 
 .panel-header {
@@ -356,6 +369,11 @@ button {
 .tag.success {
   background: #ecfdf3;
   color: var(--success);
+}
+
+.tag.danger {
+  background: #fff1f2;
+  color: var(--primary-strong);
 }
 
 .permission-tree {

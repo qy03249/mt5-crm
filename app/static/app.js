@@ -9,6 +9,7 @@ const state = {
   accounts: [],
   roles: [],
   permissionTree: [],
+  operationLogs: [],
 };
 
 const topMenus = [
@@ -197,16 +198,18 @@ async function login(username, password) {
 }
 
 async function loadAppData() {
-  const [user, accounts, roles, permissionTree] = await Promise.all([
+  const [user, accounts, roles, permissionTree, operationLogs] = await Promise.all([
     request("/auth/me"),
     request("/admin/accounts"),
     request("/admin/roles"),
     request("/admin/permissions/tree"),
+    request("/admin/operation-logs"),
   ]);
   state.user = user;
   state.accounts = accounts;
   state.roles = roles;
   state.permissionTree = permissionTree;
+  state.operationLogs = operationLogs;
   render();
 }
 
@@ -349,6 +352,9 @@ function renderMain() {
   if (state.sidePage === "admin.account") {
     return renderAccountPage();
   }
+  if (state.sidePage === "record.operationLog") {
+    return renderOperationLogPage();
+  }
   return renderPlaceholderPage();
 }
 
@@ -446,6 +452,58 @@ function renderRolePermissionPage() {
       </section>
     </div>
   `;
+}
+
+function renderOperationLogPage() {
+  return `
+    <section class="page-title">操作日志</section>
+    <section class="toolbar">
+      <input class="search-input" placeholder="操作员/路径/IP" />
+      <select class="filter-select">
+        <option>全部结果</option>
+        <option>success</option>
+        <option>failure</option>
+      </select>
+      <button class="ghost-button" type="button" id="refreshLogsButton">刷新</button>
+    </section>
+    <section class="panel table-panel">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>操作员</th>
+            <th>方法</th>
+            <th>路径</th>
+            <th>IP地址</th>
+            <th>结果</th>
+            <th>操作时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.operationLogs
+            .map(
+              (log) => `
+                <tr>
+                  <td>${log.id}</td>
+                  <td>${escapeHtml(log.operator_name)}</td>
+                  <td><span class="tag">${escapeHtml(log.method)}</span></td>
+                  <td>${escapeHtml(log.path)}</td>
+                  <td>${escapeHtml(log.ip_address)}</td>
+                  <td><span class="tag ${log.result === "success" ? "success" : "danger"}">${escapeHtml(log.result)}</span></td>
+                  <td>${formatDateTime(log.operated_at)}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </section>
+  `;
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  return String(value).replace("T", " ").slice(0, 19);
 }
 
 function renderPermissionTree(nodes) {

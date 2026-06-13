@@ -174,6 +174,22 @@ def test_write_api_creates_operation_log(client: TestClient, db_session: Session
     assert '"password": "***"' in log.params_json
 
 
+def test_admin_can_read_operation_logs(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+    token = login(client)
+
+    response = client.get(
+        "/api/v1/admin/operation-logs",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["path"] == "/api/v1/auth/login"
+    assert response.json()[0]["method"] == "POST"
+    assert response.json()[0]["result"] == "success"
+    assert response.json()[0]["params_json"]["body"]["password"] == "***"
+
+
 def test_current_user_can_read_menu_permissions(client: TestClient, db_session: Session):
     seed_admin_with_menu_permission(db_session)
 

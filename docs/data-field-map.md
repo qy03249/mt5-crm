@@ -557,11 +557,20 @@ MT5 常用字段：
 - site_chinese_name
 - site_english_name
 - default_language
+- enabled_languages
 - logo_file_id
 - favicon_file_id
 - register_methods
 - email_domain
 - admin_login_verify_method
+
+首版语言默认值：
+
+- `zh-CN`：简体中文
+- `zh-TW`：繁体中文
+- `en-US`：English
+
+品牌信息、语言、Logo、favicon 均由后台配置维护。初始化时可以写默认值，但不得在业务代码中写死。
 
 ### 11.2 security_settings
 
@@ -602,6 +611,44 @@ MT5 常用字段：
 | auto_deposit_enabled | 自动入金 |
 | withdrawal_review_mode | 出金审核策略 |
 | payment_check_enabled | 支付检查开关 |
+
+入出金规则必须后台可配置，不能写死在代码中。首版应支持：
+
+- 入金币种
+- 出金币种
+- 最低入金金额
+- 最高入金金额
+- 最低出金金额
+- 最高出金金额
+- 入金手续费规则
+- 出金手续费规则
+- 汇率规则
+- 入金是否自动审核
+- 出金是否人工审核
+- 出金是否需要支付检查
+
+### 11.4 payment_method_settings
+
+页面：设置 / 出入金设置 / 在线入金、固定钱包、本地汇款、数字货币
+
+支付/收款方式必须后台可配置，不能写死在代码中。
+
+| 字段 | 类型建议 | 说明 |
+|---|---|---|
+| id | BIGINT | 主键 |
+| method_type | VARCHAR(64) | online/bank/wallet/crypto |
+| name | VARCHAR(128) | 名称 |
+| currency | VARCHAR(16) | 币种 |
+| config_json | JSON | 通道或收款配置 |
+| sort_order | INT | 排序 |
+| status | VARCHAR(32) | 启用/停用 |
+
+不同方式的 `config_json` 可保存不同结构：
+
+- 在线入金：网关地址、商户号、回调地址、密钥引用。
+- 银行汇款：收款人、银行名、开户地址、账号、SWIFT。
+- 固定钱包：钱包名称、账户、二维码文件。
+- 数字货币：链类型、币种、地址、二维码文件、确认数。
 
 ## 12. 开发时如何使用本文档
 

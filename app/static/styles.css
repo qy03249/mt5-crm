@@ -230,6 +230,8 @@ button {
 .sidebar {
   background: var(--sidebar);
   border-right: 1px solid var(--line);
+  max-height: calc(100vh - 66px);
+  overflow-y: auto;
 }
 
 .side-group {
@@ -393,6 +395,23 @@ button {
   display: grid;
   place-items: center;
   color: var(--muted);
+}
+
+.placeholder-panel {
+  min-height: 260px;
+  padding: 42px;
+}
+
+.placeholder-title {
+  margin-bottom: 12px;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.placeholder-text {
+  max-width: 620px;
+  color: var(--muted);
+  line-height: 1.8;
 }
 
 .error {

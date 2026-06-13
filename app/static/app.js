@@ -5,7 +5,7 @@ const state = {
   token: localStorage.getItem(TOKEN_KEY),
   user: null,
   topMenu: "setting",
-  sidePage: "account",
+  sidePage: "admin.account",
   accounts: [],
   roles: [],
   permissionTree: [],
@@ -20,22 +20,133 @@ const topMenus = [
   { key: "setting", label: "设置" },
 ];
 
-const settingMenus = [
-  { group: "CRM设置", children: [] },
-  { group: "MT5设置", children: [] },
-  { group: "出入金设置", children: [] },
-  { group: "返佣设置", children: [] },
-  { group: "消息设置", children: [] },
-  { group: "用户管理", children: [] },
-  {
-    group: "后台权限",
-    children: [
-      { key: "account", label: "后台账户" },
-      { key: "role", label: "角色权限" },
-    ],
-  },
-  { group: "下载中心", children: [] },
-];
+const navigation = {
+  home: [
+    {
+      group: "工作台",
+      children: [{ key: "home.dashboard", label: "首页概览" }],
+    },
+  ],
+  task: [
+    {
+      group: "审核任务",
+      children: [
+        { key: "task.identity", label: "认证审核" },
+        { key: "task.accountOpen", label: "开户审核" },
+        { key: "task.deposit", label: "入金审核" },
+        { key: "task.withdrawal", label: "出金审核" },
+      ],
+    },
+  ],
+  client: [
+    {
+      group: "客户管理",
+      children: [
+        { key: "client.crmUser", label: "CRM用户" },
+        { key: "client.hierarchy", label: "CRM上下级" },
+        { key: "client.mt5Account", label: "MT5账户" },
+      ],
+    },
+  ],
+  report: [
+    {
+      group: "财务报表",
+      children: [
+        { key: "report.deposit", label: "入金报表" },
+        { key: "report.withdrawal", label: "出金报表" },
+        { key: "report.transfer", label: "转账报表" },
+        { key: "report.funds", label: "资金报表" },
+        { key: "report.financeStatistics", label: "统计报表" },
+      ],
+    },
+    {
+      group: "交易报表",
+      children: [
+        { key: "report.tradeStatistics", label: "统计报表" },
+        { key: "report.symbol", label: "品种报表" },
+        { key: "report.profit", label: "盈亏/查询报表" },
+        { key: "report.position", label: "持仓报表" },
+        { key: "report.closed", label: "平仓报表" },
+        { key: "report.pending", label: "挂单报表" },
+      ],
+    },
+    {
+      group: "佣金报表",
+      children: [{ key: "report.commissionOrder", label: "订单返佣" }],
+    },
+  ],
+  record: [
+    {
+      group: "消息记录",
+      children: [
+        { key: "record.email", label: "邮件记录" },
+        { key: "record.notification", label: "短信/通知记录" },
+      ],
+    },
+    {
+      group: "审计记录",
+      children: [{ key: "record.operationLog", label: "操作日志" }],
+    },
+  ],
+  setting: [
+    {
+      group: "CRM设置",
+      children: [
+        { key: "setting.platform", label: "平台设置" },
+        { key: "setting.security", label: "安全设置" },
+        { key: "setting.authentication", label: "认证设置" },
+        { key: "setting.general", label: "通用设置" },
+      ],
+    },
+    {
+      group: "MT5设置",
+      children: [
+        { key: "setting.mt5Base", label: "基础设置" },
+        { key: "setting.mt5Server", label: "服务器设置" },
+        { key: "setting.mt5Sync", label: "同步设置" },
+      ],
+    },
+    {
+      group: "出入金设置",
+      children: [
+        { key: "setting.fundsBase", label: "基础设置" },
+        { key: "setting.onlineDeposit", label: "在线入金" },
+        { key: "setting.wallet", label: "汇款/钱包配置" },
+      ],
+    },
+    {
+      group: "返佣设置",
+      children: [{ key: "setting.commissionRule", label: "返佣规则" }],
+    },
+    {
+      group: "消息设置",
+      children: [
+        { key: "setting.email", label: "邮件设置" },
+        { key: "setting.message", label: "短信/通知设置" },
+      ],
+    },
+    {
+      group: "用户管理",
+      children: [{ key: "setting.blacklist", label: "黑名单" }],
+    },
+    {
+      group: "后台权限",
+      children: [
+        { key: "admin.account", label: "后台账户" },
+        { key: "admin.role", label: "角色权限" },
+      ],
+    },
+    {
+      group: "下载中心",
+      children: [{ key: "setting.download", label: "下载资源" }],
+    },
+  ],
+};
+
+const pageTitles = Object.values(navigation)
+  .flat()
+  .flatMap((group) => group.children)
+  .reduce((result, item) => ({ ...result, [item.key]: item.label }), {});
 
 async function request(path, options = {}) {
   const headers = {
@@ -138,7 +249,7 @@ function renderLogin() {
       <section class="login-visual">
         <div class="login-copy">
           <h1>MT5 CRM 客户管理系统</h1>
-          <p>对齐参考系统的菜单和业务逻辑，先完成后台账户、角色权限和基础工作台，再逐步扩展客户、任务、报表和记录模块。</p>
+          <p>对齐参考系统的菜单和业务逻辑，先完成后台基础框架，再逐步接入客户、任务、报表、记录和设置模块。</p>
         </div>
       </section>
     </main>
@@ -179,7 +290,7 @@ function renderApp() {
         </div>
       </header>
       <section class="workspace">
-        ${state.topMenu === "setting" ? renderSidebar() : ""}
+        ${renderSidebar()}
         <main class="main">${renderMain()}</main>
       </section>
     </div>
@@ -188,6 +299,7 @@ function renderApp() {
   document.querySelectorAll("[data-top-menu]").forEach((button) => {
     button.addEventListener("click", () => {
       state.topMenu = button.dataset.topMenu;
+      state.sidePage = navigation[state.topMenu][0].children[0].key;
       renderApp();
     });
   });
@@ -205,13 +317,13 @@ function renderApp() {
 function renderSidebar() {
   return `
     <aside class="sidebar">
-      ${settingMenus
+      ${navigation[state.topMenu]
         .map(
           (group) => `
             <div class="side-group">
               <button class="side-parent" type="button">
                 <span>${group.group}</span>
-                <span>${group.children.length ? "⌃" : "⌄"}</span>
+                <span>${group.children.length ? "^" : "v"}</span>
               </button>
               ${group.children
                 .map(
@@ -231,15 +343,25 @@ function renderSidebar() {
 }
 
 function renderMain() {
-  if (state.topMenu !== "setting") {
-    const menu = topMenus.find((item) => item.key === state.topMenu);
-    return `<section class="empty-page">${menu.label}模块将在对应功能清单开发时接入</section>`;
-  }
-
-  if (state.sidePage === "role") {
+  if (state.sidePage === "admin.role") {
     return renderRolePermissionPage();
   }
-  return renderAccountPage();
+  if (state.sidePage === "admin.account") {
+    return renderAccountPage();
+  }
+  return renderPlaceholderPage();
+}
+
+function renderPlaceholderPage() {
+  const topMenu = topMenus.find((item) => item.key === state.topMenu);
+  const pageTitle = pageTitles[state.sidePage] || topMenu.label;
+  return `
+    <section class="page-title">${pageTitle}</section>
+    <section class="panel placeholder-panel">
+      <div class="placeholder-title">${topMenu.label} / ${pageTitle}</div>
+      <div class="placeholder-text">菜单已按参考系统写入，当前页面将在对应开发任务中接入筛选、表格、表单和业务操作。</div>
+    </section>
+  `;
 }
 
 function renderAccountPage() {
@@ -247,7 +369,7 @@ function renderAccountPage() {
     <section class="page-title">后台账户</section>
     <section class="toolbar">
       <input class="search-input" placeholder="搜索账号/姓名/邮箱" />
-      <button class="primary-button" type="button">＋ 新增账户</button>
+      <button class="primary-button" type="button">+ 新增账户</button>
       <button class="ghost-button" type="button">刷新</button>
     </section>
     <section class="panel">
@@ -290,7 +412,7 @@ function renderRolePermissionPage() {
       <section class="panel">
         <div class="panel-header">
           <span>角色列表</span>
-          <button class="primary-button" type="button">＋ 新增角色</button>
+          <button class="primary-button" type="button">+ 新增角色</button>
         </div>
         <table class="table">
           <thead>

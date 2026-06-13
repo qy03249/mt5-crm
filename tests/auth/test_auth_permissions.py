@@ -38,6 +38,26 @@ def client(db_session: Session):
 
 def seed_admin_with_menu_permission(db: Session) -> AdminUser:
     role = Role(code="admin", name="管理员")
+    setting_permission = Permission(
+        code="setting.view",
+        name="设置",
+        type="menu",
+        path="/setting",
+    )
+    backend_permission = Permission(
+        code="setting.backend_permission.view",
+        name="后台权限",
+        type="menu",
+        path=None,
+        parent_id=1,
+    )
+    account_menu = Permission(
+        code="admin.account.view",
+        name="后台账户",
+        type="menu",
+        path="/setting/permissions/account",
+        parent_id=2,
+    )
     permission = Permission(
         code="dashboard.view",
         name="首页",
@@ -49,6 +69,7 @@ def seed_admin_with_menu_permission(db: Session) -> AdminUser:
         name="后台账户管理",
         type="button",
         path="/setting/permissions/account",
+        parent_id=3,
     )
     admin = AdminUser(
         username="admin",
@@ -57,7 +78,15 @@ def seed_admin_with_menu_permission(db: Session) -> AdminUser:
         email="admin@example.test",
         status="active",
     )
-    role.permissions.extend([permission, button_permission])
+    role.permissions.extend(
+        [
+            setting_permission,
+            backend_permission,
+            account_menu,
+            permission,
+            button_permission,
+        ]
+    )
     admin.roles.append(role)
     db.add(admin)
     db.commit()
@@ -115,6 +144,30 @@ def test_current_user_can_read_menu_permissions(client: TestClient, db_session: 
     assert response.json() == [
         {
             "id": 1,
+            "code": "setting.view",
+            "name": "设置",
+            "type": "menu",
+            "path": "/setting",
+            "parent_id": None,
+        },
+        {
+            "id": 2,
+            "code": "setting.backend_permission.view",
+            "name": "后台权限",
+            "type": "menu",
+            "path": None,
+            "parent_id": 1,
+        },
+        {
+            "id": 3,
+            "code": "admin.account.view",
+            "name": "后台账户",
+            "type": "menu",
+            "path": "/setting/permissions/account",
+            "parent_id": 2,
+        },
+        {
+            "id": 4,
             "code": "dashboard.view",
             "name": "首页",
             "type": "menu",
@@ -136,14 +189,65 @@ def test_current_user_can_read_button_permissions(client: TestClient, db_session
     assert response.status_code == 200
     assert response.json() == [
         {
-            "id": 2,
+            "id": 5,
             "code": "admin.account.manage",
             "name": "后台账户管理",
             "type": "button",
             "path": "/setting/permissions/account",
-            "parent_id": None,
+            "parent_id": 3,
         }
     ]
+
+
+def test_admin_can_read_permission_tree(client: TestClient, db_session: Session):
+    seed_admin_with_menu_permission(db_session)
+
+    token = login(client)
+    response = client.get(
+        "/api/v1/admin/permissions/tree",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0] == {
+        "id": 1,
+        "code": "setting.view",
+        "name": "设置",
+        "type": "menu",
+        "path": "/setting",
+        "parent_id": None,
+        "children": [
+            {
+                "id": 2,
+                "code": "setting.backend_permission.view",
+                "name": "后台权限",
+                "type": "menu",
+                "path": None,
+                "parent_id": 1,
+                "children": [
+                    {
+                        "id": 3,
+                        "code": "admin.account.view",
+                        "name": "后台账户",
+                        "type": "menu",
+                        "path": "/setting/permissions/account",
+                        "parent_id": 2,
+                        "children": [
+                            {
+                                "id": 5,
+                                "code": "admin.account.manage",
+                                "name": "后台账户管理",
+                                "type": "button",
+                                "path": "/setting/permissions/account",
+                                "parent_id": 3,
+                                "children": [],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
 
 
 def test_admin_can_create_role_permission_account_and_assign_permission(

@@ -32,6 +32,10 @@ class PermissionRead(BaseModel):
     parent_id: int | None = None
 
 
+class PermissionTreeRead(PermissionRead):
+    children: list["PermissionTreeRead"] = Field(default_factory=list)
+
+
 class RolePermissionUpdate(BaseModel):
     permission_ids: list[int]
 

@@ -11,6 +11,7 @@ from app.modules.admin.schemas import (
     AdminAccountRead,
     PermissionCreate,
     PermissionRead,
+    PermissionTreeRead,
     RoleCreate,
     RolePermissionUpdate,
     RolePermissionUpdateResult,
@@ -45,6 +46,37 @@ def permission_to_read(permission: Permission) -> PermissionRead:
         path=permission.path,
         parent_id=permission.parent_id,
     )
+
+
+def permission_to_tree_read(
+    permission: Permission,
+    children_by_parent_id: dict[int | None, list[Permission]],
+) -> PermissionTreeRead:
+    children = children_by_parent_id.get(permission.id, [])
+    return PermissionTreeRead(
+        id=permission.id,
+        code=permission.code,
+        name=permission.name,
+        type=permission.type,
+        path=permission.path,
+        parent_id=permission.parent_id,
+        children=[
+            permission_to_tree_read(child, children_by_parent_id) for child in children
+        ],
+    )
+
+
+def permissions_to_tree(permissions: list[Permission]) -> list[PermissionTreeRead]:
+    children_by_parent_id: dict[int | None, list[Permission]] = {}
+    permission_ids = {permission.id for permission in permissions}
+    for permission in sorted(permissions, key=lambda item: item.id):
+        parent_id = permission.parent_id if permission.parent_id in permission_ids else None
+        children_by_parent_id.setdefault(parent_id, []).append(permission)
+
+    return [
+        permission_to_tree_read(permission, children_by_parent_id)
+        for permission in children_by_parent_id.get(None, [])
+    ]
 
 
 def account_to_read(account: AdminUser) -> AdminAccountRead:
@@ -118,6 +150,12 @@ def create_permission(
 def list_permissions(db: Annotated[Session, Depends(get_db)]) -> list[PermissionRead]:
     permissions = db.scalars(select(Permission)).all()
     return [permission_to_read(permission) for permission in permissions]
+
+
+@router.get("/permissions/tree", response_model=list[PermissionTreeRead])
+def list_permission_tree(db: Annotated[Session, Depends(get_db)]) -> list[PermissionTreeRead]:
+    permissions = db.scalars(select(Permission)).all()
+    return permissions_to_tree(list(permissions))
 
 
 @router.get("/permissions/menus", response_model=list[PermissionRead])
